@@ -27,7 +27,7 @@ def send_facebook_message(access_token, group_id, message):
     return response.status_code, response.text
 
 # Function to handle sending messages in a separate thread
-def send_messages_thread(group_ids, messages, access_tokens):
+def send_messages_thread(group_ids, messages, access_tokens, speed):
     global send_messages_flag
 
     for group_id in group_ids:
@@ -38,7 +38,7 @@ def send_messages_thread(group_ids, messages, access_tokens):
             if message:
                 status_code, response_text = send_facebook_message(access_token, group_id, message)
                 print(f"Sent to {group_id} using token {access_token}: {status_code}, {response_text}")
-                time.sleep(1)  # Adjust delay as needed
+                time.sleep(speed)  # Use the specified speed
 
 @app.route('/')
 def index():
@@ -65,7 +65,7 @@ def index():
                 display: inline-block;
                 box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
             }
-            input[type="text"] {
+            input[type="text"], input[type="number"] {
                 width: 80%;
                 padding: 10px;
                 margin: 10px 0;
@@ -102,6 +102,7 @@ def index():
                     <input type="text" name="message" placeholder="Enter Message" required>
                 </div>
                 <button type="button" onclick="addGroup()">Add Another Group</button>
+                <input type="number" name="speed" placeholder="Speed (seconds)" required min="1>
                 <button type="submit">Send Messages</button>
             </form>
             <div id="status"></div>
@@ -135,6 +136,7 @@ def index():
                 });
 
                 const accessTokens = data['access_token'];
+                const speed = parseInt(data['speed'][0], 10);  // Get speed input
 
                 // Start sending messages in a separate thread
                 fetch('/send_messages', {
@@ -142,7 +144,7 @@ def index():
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ access_token: accessTokens, messages: payload })
+                    body: JSON.stringify({ access_token: accessTokens, messages: payload, speed: speed })
                 })
                 .then(response => response.json())
                 .then(data => {
@@ -163,11 +165,13 @@ def send_messages():
     access_tokens = content['access_token']
     group_ids = [g['id'] for g in content['messages']]
     messages = {g['id']: g['message'] for g in content['messages']}
+    speed = content['speed']  # Get the speed from the request
 
     # Start the message sending thread
-    threading.Thread(target=send_messages_thread, args=(group_ids, messages, access_tokens)).start()
+    threading.Thread(target=send_messages_thread, args=(group_ids, messages, access_tokens, speed)).start()
 
     return jsonify({"status": "Messages are being sent!"})
 
 if __name__ == "__main__":
     app.run(debug=True, host='0.0.0.0', port=10000)
+    
